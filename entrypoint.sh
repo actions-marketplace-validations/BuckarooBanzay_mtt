@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 set -e
 export WORLDPATH=${HOME}/.minetest/worlds/world
 
@@ -9,32 +9,71 @@ mkdir -p ${WORLDPATH}/worldmods/
 cd ${WORLDPATH}/worldmods/
 for dep in ${INPUT_GIT_DEPENDENCIES}
 do
-    git clone --depth=1 $dep
+    if [ ! -d $(basename $dep) ]
+    then
+        git clone --recurse-submodules --depth=1 $dep
+    fi
 done
 
-# add the mtt mod if it does not exist
-test -d ${WORLDPATH}/worldmods/mtt ||{
-    git clone --depth=1 https://github.com/BuckarooBanzay/mtt
-}
-
-# install game
+# add game or mod
 cd ${WORLDPATH}/
-git clone --depth=1 ${INPUT_GIT_GAME_REPO} game
+if [ "${INPUT_TEST_MODE}" == "mod" ]
+then
+    # repository is a mod
+    echo "testing-mode: mod"
 
-# create link to current mod
-ln -s /github/workspace ${WORLDPATH}/worldmods/${INPUT_MODNAME}
+    # determine modname
+    modname=${GITHUB_REPOSITORY#*/}
+    if [ ! -z "${INPUT_MODNAME}" ]
+    then
+        modname=${INPUT_MODNAME}
+    fi
+
+    # install game
+    if [ ! -d "game" ]
+    then
+        echo "Cloning ${INPUT_GIT_GAME_REPO} into game directory"
+        git clone --recurse-submodules --depth=1 ${INPUT_GIT_GAME_REPO} game
+    fi
+
+    # create link to current mod
+    if [ ! -L ${WORLDPATH}/worldmods/${modname} ]
+    then
+        ln -s /github/workspace ${WORLDPATH}/worldmods/${modname}
+    fi
+else
+    # repository is a game
+    echo "testing-mode: game"
+    if [ ! -L ${WORLDPATH}/game ]
+    then
+        ln -s /github/workspace ${WORLDPATH}/game
+    fi
+fi
+
+# add the mtt mod if it does not exist
+if [ ! -d ${WORLDPATH}/worldmods/mtt ]
+then
+   git clone --depth=1 https://github.com/BuckarooBanzay/mtt ${WORLDPATH}/worldmods/mtt
+fi
+
+# check for "mtt_filter" var, use modname if not set
+export mtt_filter=${modname}
+if [ ! -z "${INPUT_MTT_FILTER}" ]
+then
+    mtt_filter=${INPUT_MTT_FILTER}
+fi
+echo "list of mods to test: ${mtt_filter}"
 
 # assemble minetest.conf
 cat <<EOF > /minetest.conf
 mg_name = ${INPUT_MAPGEN}
-mtt_filter = ${INPUT_MODNAME}
+mtt_filter = ${mtt_filter}
+mtt_enable_coverage = ${INPUT_ENABLE_COVERAGE}
+mtt_enable_benchmarks = ${INPUT_ENABLE_BENCHMARKS}
 mtt_enable = true
 secure.trusted_mods = mtt
 EOF
 echo "${INPUT_ADDITIONAL_CONFIG}" >> /minetest.conf
-
-test "${INPUT_ENABLE_COVERAGE}" == "true" && echo "mtt_enable_coverage = true" >> /minetest.conf
-test "${INPUT_ENABLE_BENCHMARKS}" == "true" && echo "mtt_enable_benchmarks = true" >> /minetest.conf
 
 # simple world.mt
 cat <<EOF > ${WORLDPATH}/world.mt
@@ -49,11 +88,16 @@ world_name = mtt
 EOF
 
 # start the engine
-minetestserver --config /minetest.conf --world ${WORLDPATH}
+luantiserver --config /minetest.conf --world ${WORLDPATH}
 
 # coverage filename replace
-test "${INPUT_ENABLE_COVERAGE}" == "true" &&{
-    sed -i "s#${WORLDPATH}/worldmods/${INPUT_MODNAME}/##g" ${WORLDPATH}/lcov.info
-    mkdir /github/workspace/coverage
+if [ "${INPUT_ENABLE_COVERAGE}" == "true" ]
+then
+    for modname in $(echo ${mtt_filter} | tr ',' ' ')
+    do
+        sed -i "s#${WORLDPATH}/worldmods/${modname}/##g" ${WORLDPATH}/lcov.info
+        sed -i "s#${WORLDPATH}/game/mods/${modname}/##g" ${WORLDPATH}/lcov.info
+    done
+    mkdir -p /github/workspace/coverage
     cp ${WORLDPATH}/lcov.info /github/workspace/coverage/
-}
+fi

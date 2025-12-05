@@ -51,6 +51,16 @@ mtt.register_with_area("emerged area test", {
     assert(pos2.z - pos1.z == 9)
     callback()
 end)
+
+-- test definition table with timeout (optional)
+mtt.register("my long test", {
+  -- timeout defaults to 10 seconds unless manually specified
+  timeout = 5,
+  -- main test function
+  func = function(callback)
+    -- TODO: test things here
+  end
+})
 ```
 
 Helper functions:
@@ -66,8 +76,11 @@ mtt.export_nodenames(filename)
 mtt.validate_nodenames(minetest.get_modpath("my_mod") .. "/nodenames.txt")
 
 -- simulate a player (EXPERIMENTAL, some methods aren't implemented yet)
+-- NOTE: requires the `fakelib` mod to be present
 local player = mtt.join_player("singleplayer")
-player:leave()
+-- TODO: use the player instance somewhere
+-- let the player leave
+mtt.leave_player("singleplayer")
 ```
 
 # Executing
@@ -77,21 +90,20 @@ This mod is inert by default and only provides its api.
 To actually enable the tests add the following in your minetest config:
 ```
 mtt_enable = true
-```
-
-After starting the minetest engine with this setting the mod will run all tests
-and shutdown with an exit code of `0` if everything executed successfully.
-
-## Filtering executed tests
-
-Tests can be filtered with the `mtt_filter` setting.
-
-For example:
-```
 mtt_filter = my_mod,my_other_mod
 ```
 
-This will only execute tests from the mod `my_mod` and `my_other_mod`
+After starting the minetest engine with this setting the mod will run all tests in the specified mod(s)
+and shutdown with an exit code of `0` if everything executed successfully.
+
+To ensure the tests are only registered if the `mtt` mod is present and enabled you might want to add the following check:
+```lua
+if minetest.get_modpath("mtt") and mtt.enabled then
+ -- register tests here (directly or via dofile)
+end
+```
+
+A complete example on how to add `mtt` for testing is available in the [mapsync](https://github.com/BuckarooBanzay/mapsync/blob/master/init.lua) mod
 
 # Github action
 
@@ -132,28 +144,29 @@ jobs:
 ```
 
 All parameters:
-* `modname` (required) the name of the mod
+* `modname` the name of the mod, defaults to the repository-name
+* `mtt_filter` custom mods to filter for tests (`modname` is used if this is not set)
 * `enable_coverage` enables coverage stats
 * `enable_benchmarks` enables the benchmarks
 * `git_dependencies` list of dependencies (git repositories)
 * `additional_config` additional lines in the minetest.conf
 * `git_game_repo` url to the game (defaults to the minetest_game)
+* `test_mode` either 'mod' if the repository is a mod or 'game'
 * `mapgen` the mapgen t use (default so singlenode)
 
-# Using with "raw" docker
+# Running with plain docker
 
-For a CI example with docker you can take a look at the code from the `mtzip` mod:
+To use this with standalone docker you can use the provided docker image:
+```sh
+docker run --rm -it -v $(pwd):/github/workspace \
+    -e INPUT_MODNAME=promise \
+    -e INPUT_TEST_MODE=mod \
+    -e INPUT_MAPGEN=singlenode \
+    -e INPUT_GIT_GAME_REPO=https://github.com/minetest/minetest_game \
+    ghcr.io/buckaroobanzay/mtt
+```
 
-Repository: https://github.com/BuckarooBanzay/mtzip
-
-The important files:
-* `mtt.lua` the tests, those could alternatively be inlined with the main code
-* `docker-compose.yml` the compose file that starts the minetest engine with `docker-compose up`
-* `.github/workflows/test.yml` the github workflow file with a version matrix
-* `test/minetest.conf` the server config for the test-mod
-* `test/Dockerfile` dockerfile that pulls in test-dependencies including the `mtt` mod from the `master` branch
-
-The whole testing can of course also be done without any docker tools.
+The above example uses `promise` as mtt-filter, `singlenode` as mapgen and the default mtg as game.
 
 # Related work
 

@@ -1,17 +1,19 @@
-version: "3.6"
 
 services:
- sut:
-  build:
-   context: ./test
-   args:
-    ENGINE_VERSION: ${ENGINE_VERSION:-5.5.0}
-  volumes:
-    - "./:/root/.minetest/worlds/world/worldmods/mtt/"
-    - "./test/world.mt:/root/.minetest/worlds/world/world.mt"
-    - "./test/minetest.conf:/minetest.conf"
-    - "world:/root/.minetest/worlds/world"
-    - "./coverage:/var/lib/minetest"
+  mtt:
+    build: .
+    volumes:
+     - "./:/github/workspace"
+    environment:
+     INPUT_MODNAME: "mtt"
+     INPUT_ENABLE_BENCHMARKS: "true"
+     INPUT_ENABLE_COVERAGE: "true"
+     INPUT_GIT_DEPENDENCIES: |
+      https://github.com/BuckarooBanzay/promise
+      https://github.com/OgelGames/fakelib
+     INPUT_ADDITIONAL_CONFIG: |
+      mtt_enable_selftest = true
+     INPUT_TEST_MODE: "mod"
+     INPUT_MAPGEN: "singlenode"
+     INPUT_GIT_GAME_REPO: "https://github.com/minetest/minetest_game"
 
-volumes:
-  world: {}

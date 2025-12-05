@@ -1,7 +1,7 @@
-FROM registry.gitlab.com/minetest/minetest/server:5.6.1
+FROM ghcr.io/luanti-org/luanti:5.14.0
 USER root
 
-RUN apk add --no-cache git lua-dev luarocks &&\
+RUN apk add --no-cache bash git lua-dev luarocks &&\
     luarocks-5.1 install luacov &&\
     luarocks-5.1 install luacov-reporter-lcov
 

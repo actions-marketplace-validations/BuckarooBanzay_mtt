@@ -1,4 +1,8 @@
 
+
+-- manual test for timeout-testing
+-- mtt.register("timeout", function() end)
+
 -- test emerge helper
 mtt.emerge_area({x=0,y=0,z=0}, {x=32,y=32,z=32})
 
@@ -51,7 +55,7 @@ mtt.register("player join", function(callback)
     assert(not leave_obj)
     assert(not timed_out)
 
-    p:leave(true)
+    assert(mtt.leave_player("test", true))
     assert(leave_obj)
     assert(timed_out)
 

@@ -28,7 +28,9 @@ if mtt.export_nodenames then
 end
 
 if mtt.enabled then
-    minetest.log("warning", "mtt-mod active, don't enable this on a live-server!")
+    minetest.log("warning", "[mtt] mod active, don't enable this on a live-server!")
+    local version = minetest.get_version()
+    print(string.format("[mtt] Testing on engine: %s version: %s", version.project, version.string))
 
     if mtt.enable_coverage then
         -- enable coverage
@@ -36,8 +38,10 @@ if mtt.enabled then
         loadfile(MP .. "/coverage.lua")(ie)
     end
 
-    -- player api override
-    dofile(MP .. "/player.lua")
+    if minetest.get_modpath("fakelib") then
+        -- player api override
+        dofile(MP .. "/player.lua")
+    end
 
     -- start test execution
     dofile(MP .. "/execute.lua")
